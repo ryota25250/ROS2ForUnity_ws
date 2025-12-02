@@ -1,86 +1,94 @@
 # nav2_multi.yaml  （robot番号は記載しない）
 
 controller_server:
-  ros__parameters:
-    use_sim_time: true
-    controller_frequency: 20.0
-    odom_topic: odom                 # ← 相対名（NSで /<ns>/odom になる）
-    min_x_velocity_threshold: 0.001
-    min_theta_velocity_threshold: 0.001
+    ros__parameters:
+      controller_frequency: 15.0
+      use_sim_time: true
 
-    controller_plugins: ["FollowPath"]
-    FollowPath:
-      plugin: "dwb_core::DWBLocalPlanner"
+      amcl:
+        ros__parameters:
+          use_sim_time: true
+          odom_frame_id: "odom"
 
-      # 動き出しやすい初期値（必要に応じて後で調整）
-      min_vel_x: 0.05
-      max_vel_x: 0.35
-      min_vel_y: 0.0
-      max_vel_y: 0.0
-      max_vel_theta: 1.2
-      min_speed_xy: 0.05
-      max_speed_xy: 0.35
-      min_speed_theta: 0.1
+      # ★回頭中に「進んでない」と誤判定しないよう猶予を伸ばす
+      progress_checker:
+        plugin: "nav2_controller::SimpleProgressChecker"
+        required_movement_radius: 0.02       # 並進しなくてもOKに近い数値
+        movement_time_allowance: 15.0        # その場回転の最中に fail させない
 
-      acc_lim_x: 0.6
-      acc_lim_y: 0.0
-      acc_lim_theta: 1.2
-      decel_lim_x: -0.6
-      decel_lim_theta: -1.2
+      # ★ゴール判定：姿勢もきちんと合わせたいなら少しタイトに
+      goal_checker:
+        plugin: "nav2_controller::SimpleGoalChecker"
+        xy_goal_tolerance: 0.20              # 0.20〜0.30 の範囲でOK
+        yaw_goal_tolerance: 0.20             # ≈11.5°（揃えたいなら 0.15 まで可）
+        stateful: false
 
-      vx_samples: 15
-      vy_samples: 1
-      vtheta_samples: 25
-      sim_time: 1.5
-      linear_granularity: 0.05
-      angular_granularity: 0.025
-      transform_tolerance: 0.2
-      prune_plan: true
+      # ★ローカルプランナ（RPP前提）
+      controller_plugins: ["FollowPath"]
+      FollowPath:
+        plugin: "nav2_regulated_pure_pursuit_controller::RegulatedPurePursuitController"
 
-      critics: ["ObstacleFootprint","PathDist","GoalDist","GoalAlign","PathAlign"]
-      ObstacleFootprint.scale: 0.02
-      PathDist.scale: 24.0
-      GoalDist.scale: 16.0
-      GoalAlign.scale: 1.0
-      PathAlign.scale: 1.0
+        # 基本速度
+        desired_linear_vel: 0.35
+        max_linear_accel: 2.0
+        max_linear_decel: 2.0
+        max_angular_vel: 2.0                 # 回頭を力強く
+
+        # 追従パラメータ
+        lookahead_dist: 0.6
+        min_lookahead_dist: 0.3
+        max_lookahead_dist: 0.8
+        lookahead_time: 1.5
+        use_velocity_scaled_lookahead_dist: true
+        transform_tolerance: 0.2
+
+        # ★到着後の回頭を必ず実行
+        use_rotate_to_goal: true
+        rotate_to_goal_threshold: 0.35        # ≈20°以上ズレてたら回頭モード突入
+        rotate_to_heading_angular_vel: 1.2    # その場回転の角速度
+        min_approach_linear_velocity: 0.02    # ゴール接近時はゆっくり
+        allow_reversing: false
+
+        # 近傍減速が強すぎて止まるのを防ぐ
+        regulated_linear_scaling_min_radius: 0.8
+        regulated_linear_scaling_min_speed: 0.05
+        inflation_cost_scaling_factor: 2.5
 
 local_costmap:
-  local_costmap:
-    ros__parameters:
-      use_sim_time: true
-      update_frequency: 10.0
-      publish_frequency: 5.0
+    local_costmap:
+      ros__parameters:
+        use_sim_time: true
+        global_frame: "<ns>/odom"
+        robot_base_frame: "<ns>/base_link"
+        update_frequency: 10.0
+        publish_frequency: 5.0
+        rolling_window: true
+        width: 6
+        height: 6
+        resolution: 0.05
+        robot_radius: 0.20
+        footprint_padding: 0.02
+        transform_tolerance: 0.2
 
-      global_frame: odom            # ← 相対名（NSで /<ns>/odom）
-      robot_base_frame: base_link   # ← 相対名（NSで /<ns>/base_link）
-      rolling_window: true
-      width: 6
-      height: 6
-      resolution: 0.05
+        plugins: ["obstacle_layer", "inflation_layer"]
 
-      # 初回は障害物なしで動作確認→問題なければ scan を戻す
-      plugins: ["obstacle_layer","inflation_layer"]
-      obstacle_layer:
-        plugin: "nav2_costmap_2d::ObstacleLayer"
-        enabled: true
-        observation_sources: scan
-        scan:
-          topic: scan               # ← 相対名（NSで /<ns>/scan）
-          sensor_frame: base_scan   # ← 相対名（NSで /<ns>/base_scan）
-          data_type: LaserScan
-          clearing: true
-          marking: true
-          inf_is_valid: true
-          expected_update_rate: 0.0
-          observation_persistence: 0.0
-          min_obstacle_height: 0.0
-          max_obstacle_height: 2.0
-      inflation_layer:
-        plugin: "nav2_costmap_2d::InflationLayer"
-        enabled: true
-        inflation_radius: 0.8
-        cost_scaling_factor: 3.0
+        obstacle_layer:
+          plugin: "nav2_costmap_2d::ObstacleLayer"
+          enabled: true
+          observation_sources: scan
+          scan:
+            topic: "<ns>/scan"
+            data_type: "LaserScan"
+            clearing: true
+            marking: true
+            max_obstacle_height: 2.0
 
+        inflation_layer:
+          plugin: "nav2_costmap_2d::InflationLayer"
+          enabled: true
+          inflation_radius: 0.45          # ← 広すぎると回頭できない
+          cost_scaling_factor: 2.5
+  
 global_costmap:
   global_costmap:
     ros__parameters:
@@ -111,14 +119,14 @@ global_costmap:
         cost_scaling_factor: 3.0
 
 planner_server:
-  ros__parameters:
-    use_sim_time: true
-    expected_planner_frequency: 5.0
-    planner_plugins: ["GridBased"]
-    GridBased:
-      plugin: "nav2_navfn_planner/NavfnPlanner"
-      tolerance: 0.5
-
+    ros__parameters:
+      planner_plugins: ["GridBased"]
+      GridBased:
+        plugin: "nav2_navfn_planner/NavfnPlanner"
+        tolerance: 0.5         # 0.3〜0.7 で調整
+        allow_unknown: true
+        use_astar: false
+  
 behavior_server:
   ros__parameters:
     use_sim_time: true

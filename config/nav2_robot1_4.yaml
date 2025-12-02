@@ -1,0 +1,218 @@
+# nav2_robot1_4.yaml
+# 使い方の例:
+# ros2 launch nav2_bringup bringup_launch.py \
+#   use_namespace:=True namespace:=robot1 use_sim_time:=True autostart:=True \
+#   map:=/home/moriokalab/ROS2ForUnity_ws/my_unity_map_2.yaml \
+#   params_file:=/home/moriokalab/ROS2ForUnity_ws/config/nav2_robot1_4.yaml
+
+amcl:
+  ros__parameters:
+    use_sim_time: true
+    # Unity の TF に合わせる（namespace は起動時に付与されるので YAML ではそのまま記述）
+    base_frame_id: robot1/base_link
+    odom_frame_id: robot1/odom
+    global_frame_id: robot1/map
+    tf_broadcast: true
+    set_initial_pose: true
+    # レーザ入力（namespace により /robot1/scan に解決される）
+    scan_topic: scan
+
+    # 以降は標準的な AMCL パラメータ（必要に応じて調整）
+    alpha1: 0.2
+    alpha2: 0.2
+    alpha3: 0.2
+    alpha4: 0.2
+    alpha5: 0.2
+    update_min_d: 0.05
+    update_min_a: 0.2
+    resample_interval: 1
+    transform_tolerance: 0.2
+    min_particles: 500
+    max_particles: 2000
+    laser_max_range: 30.0
+    laser_min_range: 0.05
+    laser_model_type: likelihood_field
+    z_hit: 0.5
+    z_short: 0.05
+    z_max: 0.05
+    z_rand: 0.5
+    sigma_hit: 0.2
+    laser_likelihood_max_dist: 2.0
+
+map_server:
+  ros__parameters:
+    use_sim_time: true
+    # ★ 明示的に設定（launch の map:=... が渡らなくても安全）
+    yaml_filename: /home/moriokalab/ROS2ForUnity_ws/my_unity_map_2.yaml
+    # ★ /map をグローバルで発行
+    topic_name: /map
+    # map メッセージの frame_id も Unity 側に合わせる
+    frame_id: robot1/map
+
+planner_server:
+  ros__parameters:
+    use_sim_time: true
+    expected_planner_frequency: 20.0
+    planner_plugins: ["GridBased"]
+    GridBased:
+      plugin: nav2_navfn_planner/NavfnPlanner
+      tolerance: 0.5
+
+controller_server:
+  ros__parameters:
+    use_sim_time: true
+    controller_frequency: 20.0
+    min_x_velocity_threshold: 0.001
+    min_theta_velocity_threshold: 0.001
+    progress_checker:
+      plugin: "nav2_controller::SimpleProgressChecker"
+      required_movement_radius: 0.5
+      movement_time_allowance: 10.0
+    goal_checker:
+      plugin: "nav2_controller::SimpleGoalChecker"
+      xy_goal_tolerance: 0.25
+      yaw_goal_tolerance: 0.25
+      stateful: True
+    controller_plugins: ["FollowPath"]
+    FollowPath:
+      plugin: "dwb_core::DWBLocalPlanner"
+      debug_trajectory_details: false
+      min_vel_x: 0.0
+      max_vel_x: 0.5
+      max_vel_theta: 1.2
+      acc_lim_x: 0.5
+      acc_lim_theta: 1.5
+      decel_lim_x: -0.5
+      decel_lim_theta: -1.5
+      vx_samples: 20
+      vtheta_samples: 20
+      sim_time: 2.0
+      linear_granularity: 0.05
+      angular_granularity: 0.025
+      critics: ["RotateToGoal", "Oscillation", "BaseObstacle", "GoalAlign", "PathAlign", "PathDist", "GoalDist"]
+      BaseObstacle.scale: 0.02
+      PathAlign.scale: 32.0
+      GoalAlign.scale: 24.0
+      PathDist.scale: 32.0
+      GoalDist.scale: 24.0
+
+smoother_server:
+  ros__parameters:
+    use_sim_time: true
+    smoother_plugins: ["simple_smoother"]
+    simple_smoother:
+      plugin: "nav2_smoother::SimpleSmoother"
+      tolerance: 1.0e-10
+
+bt_navigator:
+  ros__parameters:
+    use_sim_time: true
+    global_frame: robot1/map
+    robot_base_frame: robot1/base_link
+    default_nav_to_pose_bt_xml: "navigate_to_pose_w_replanning_and_recovery.xml"
+    default_nav_through_poses_bt_xml: "navigate_through_poses_w_replanning_and_recovery.xml"
+
+behavior_server:
+  ros__parameters:
+    use_sim_time: true
+    global_frame: robot1/map
+    robot_base_frame: robot1/base_link
+    spin:
+      plugin: "nav2_behaviors/Spin"
+    backup:
+      plugin: "nav2_behaviors/BackUp"
+    drive_on_heading:
+      plugin: "nav2_behaviors/DriveOnHeading"
+    wait:
+      plugin: "nav2_behaviors/Wait"
+
+waypoint_follower:
+  ros__parameters:
+    use_sim_time: true
+    loop_rate: 20
+    stop_on_failure: false
+    waypoint_task_executor_plugin: "wait_at_waypoint"
+    wait_at_waypoint:
+      plugin: "nav2_waypoint_follower::WaitAtWaypoint"
+      enabled: True
+      waypoint_pause_duration: 0.0
+
+velocity_smoother:
+  ros__parameters:
+    use_sim_time: true
+    smoothing_frequency: 20.0
+    scale_velocities: false
+
+# ===== Costmaps =====
+local_costmap:
+  local_costmap:
+    ros__parameters:
+      use_sim_time: true
+      global_frame: robot1/odom
+      robot_base_frame: robot1/base_link
+      rolling_window: true
+      width: 5.0      # ★ float にする（height エラー対策）
+      height: 5.0     # ★ float にする
+      resolution: 0.05
+      update_frequency: 10.0
+      publish_frequency: 10.0
+      transform_tolerance: 0.2
+      plugins: ["obstacle_layer", "inflation_layer"]
+      obstacle_layer:
+        plugin: "nav2_costmap_2d::ObstacleLayer"
+        observation_sources: scan
+        scan:
+          topic: scan            # → /robot1/scan
+          data_type: LaserScan
+          clearing: true
+          marking: true
+          max_obstacle_height: 2.0
+      inflation_layer:
+        plugin: "nav2_costmap_2d::InflationLayer"
+        inflation_radius: 0.55
+        cost_scaling_factor: 3.0
+
+global_costmap:
+  global_costmap:
+    ros__parameters:
+      use_sim_time: true
+      global_frame: robot1/map
+      robot_base_frame: robot1/base_link
+      track_unknown_space: true
+      resolution: 0.05
+      update_frequency: 5.0
+      publish_frequency: 5.0
+      transform_tolerance: 0.2
+      plugins: ["static_layer", "obstacle_layer", "inflation_layer"]
+      static_layer:
+        plugin: "nav2_costmap_2d::StaticLayer"
+        map_subscribe_transient_local: true
+        subscribe_to_updates: false
+      obstacle_layer:
+        plugin: "nav2_costmap_2d::ObstacleLayer"
+        observation_sources: scan
+        scan:
+          topic: scan            # → /robot1/scan
+          data_type: LaserScan
+          clearing: true
+          marking: true
+          max_obstacle_height: 2.0
+      inflation_layer:
+        plugin: "nav2_costmap_2d::InflationLayer"
+        inflation_radius: 0.55
+        cost_scaling_factor: 3.0
+
+# ===== Lifecycle Managers =====
+lifecycle_manager_localization:
+  ros__parameters:
+    use_sim_time: true
+    autostart: true
+    node_names: ["map_server", "amcl"]
+
+lifecycle_manager_navigation:
+  ros__parameters:
+    use_sim_time: true
+    autostart: true
+    node_names: ["controller_server", "smoother_server", "planner_server",
+                 "behavior_server", "bt_navigator", "waypoint_follower",
+                 "velocity_smoother"]

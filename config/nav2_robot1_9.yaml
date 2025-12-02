@@ -1,0 +1,204 @@
+# nav2_robot1_9.yaml
+# 目的:
+#  - すべてのNav2ノードはnamespace=robot1で起動
+#  - TFのフレームは Unity に合わせて robot1/* を明示（ただし global "map" は非NS）
+#  - map_server のトピックは /map（絶対名）で発行
+#  - TFバッファとトレランスを広げ、Message Filter の drop を低減
+#  - YAML内に絶対トピック /robot1/... は置かない（重複スラッシュ事故の予防）
+
+amcl:
+  ros__parameters:
+    use_sim_time: true
+
+    # --- Frame IDs (TF) ---
+    base_frame_id: robot1/base_link
+    odom_frame_id: robot1/odom
+    global_frame_id: map          # <- map は非NSに統一（/map トピックと整合）
+
+    # --- Laser input ---
+    scan_topic: scan              # robot1 名前空間で解決され /robot1/scan を購読
+
+    # --- AMCL common ---
+    min_particles: 500
+    max_particles: 2000
+    kld_err: 0.05
+    kld_z: 0.99
+    update_min_d: 0.05
+    update_min_a: 0.2
+    resample_interval: 1
+    laser_model_type: likelihood_field
+    z_hit: 0.95
+    z_rand: 0.05
+    sigma_hit: 0.2
+    laser_likelihood_max_dist: 2.0
+
+    # 時間まわりの安定化
+    tf_buffer_duration: 10.0       # TFを長めに保持
+    transform_tolerance: 0.5       # 少し余裕を持たせる
+
+map_server:
+  ros__parameters:
+    use_sim_time: true
+    # bringup_launch.py の map:= で yaml_filename は渡されます（ここでは指定しない）
+    topic_name: /map               # 発行トピックを /map に固定（絶対名）
+
+planner_server:
+  ros__parameters:
+    use_sim_time: true
+    expected_planner_frequency: 10.0
+    planner_plugins: ["GridBased"]
+    GridBased:
+      plugin: "nav2_navfn_planner/NavfnPlanner"
+
+controller_server:
+  ros__parameters:
+    use_sim_time: true
+    controller_frequency: 20.0
+    progress_checker:
+      plugin: "nav2_controller::SimpleProgressChecker"
+    goal_checker:
+      plugin: "nav2_controller::SimpleGoalChecker"
+    controller_plugins: ["FollowPath"]
+    FollowPath:
+      plugin: "dwb_core::DWBLocalPlanner"
+      debug_trajectory_details: false
+      min_vel_x: 0.0
+      max_vel_x: 0.6
+      min_vel_y: 0.0
+      max_vel_y: 0.0
+      max_vel_theta: 1.0
+      acc_lim_x: 1.0
+      acc_lim_theta: 2.0
+      decel_lim_x: -1.0
+      decel_lim_theta: -2.0
+      vx_samples: 20
+      vtheta_samples: 20
+      sim_time: 1.5
+      critic_plugins:
+        - "RotateToGoal"
+        - "Oscillation"
+        - "BaseObstacle"
+        - "GoalAlign"
+        - "PathAlign"
+        - "PathDist"
+        - "GoalDist"
+
+smoother_server:
+  ros__parameters:
+    use_sim_time: true
+    smoother_plugins: ["simple_smoother"]
+    simple_smoother:
+      plugin: "nav2_smoother::SimpleSmoother"
+
+behavior_server:
+  ros__parameters:
+    use_sim_time: true
+    behavior_plugins: ["spin", "backup", "drive_on_heading", "wait"]
+    spin:
+      plugin: "nav2_behaviors/Spin"
+    backup:
+      plugin: "nav2_behaviors/BackUp"
+    drive_on_heading:
+      plugin: "nav2_behaviors/DriveOnHeading"
+    wait:
+      plugin: "nav2_behaviors/Wait"
+
+bt_navigator:
+  ros__parameters:
+    use_sim_time: true
+    global_frame: map                 # ここも "map"
+    robot_base_frame: robot1/base_link
+    transform_tolerance: 0.5
+
+waypoint_follower:
+  ros__parameters:
+    use_sim_time: true
+    loop_rate: 10
+
+velocity_smoother:
+  ros__parameters:
+    use_sim_time: true
+    smoothing_frequency: 20.0
+    acceleration_limits: [1.0, 0.0, 2.0]
+    deceleration_limits: [1.0, 0.0, 2.0]
+    velocity_limits: [0.6, 0.0, 1.0]
+
+# ===== Costmaps =====
+local_costmap:
+  local_costmap:
+    ros__parameters:
+      use_sim_time: true
+      update_frequency: 10.0
+      publish_frequency: 10.0
+      rolling_window: true
+      width: 5.0
+      height: 5.0
+      resolution: 0.05
+      # フレーム名を Unity 側に合わせる
+      global_frame: robot1/odom
+      robot_base_frame: robot1/base_link
+      transform_tolerance: 0.5
+      plugins: ["voxel_layer", "inflation_layer"]
+      voxel_layer:
+        plugin: "nav2_costmap_2d::VoxelLayer"
+        enabled: true
+        observation_sources: scan
+        scan:
+          topic: scan                 # => /robot1/scan
+          max_obstacle_height: 2.0
+          clearing: true
+          marking: true
+          data_type: "LaserScan"
+      inflation_layer:
+        plugin: "nav2_costmap_2d::InflationLayer"
+        inflation_radius: 0.55
+
+global_costmap:
+  global_costmap:
+    ros__parameters:
+      use_sim_time: true
+      update_frequency: 2.0
+      publish_frequency: 2.0
+      # フレーム：map（非NS）
+      global_frame: map
+      robot_base_frame: robot1/base_link
+      resolution: 0.05
+      transform_tolerance: 0.5
+      plugins: ["static_layer", "obstacle_layer", "inflation_layer"]
+      static_layer:
+        plugin: "nav2_costmap_2d::StaticLayer"
+        # /map を購読（絶対名）し、トランジェントローカルで受け取る
+        map_subscribe_transient_local: true
+        topic: /map
+      obstacle_layer:
+        plugin: "nav2_costmap_2d::ObstacleLayer"
+        enabled: true
+        observation_sources: scan
+        scan:
+          topic: scan                 # => /robot1/scan
+          max_obstacle_height: 2.0
+          clearing: true
+          marking: true
+          data_type: "LaserScan"
+      inflation_layer:
+        plugin: "nav2_costmap_2d::InflationLayer"
+        inflation_radius: 0.8
+
+lifecycle_manager_localization:
+  ros__parameters:
+    use_sim_time: true
+    autostart: true
+    node_names: ["map_server", "amcl"]
+
+lifecycle_manager_navigation:
+  ros__parameters:
+    use_sim_time: true
+    autostart: true
+    node_names:
+      - "controller_server"
+      - "smoother_server"
+      - "planner_server"
+      - "behavior_server"
+      - "bt_navigator"
+      - "waypoint_follower"
+      - "velocity_smoother"

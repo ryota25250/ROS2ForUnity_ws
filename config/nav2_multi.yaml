@@ -1,0 +1,158 @@
+# nav2_multi.yaml  （robot番号は記載しない）
+
+controller_server:
+  ros__parameters:
+    use_sim_time: true
+    controller_frequency: 20.0
+    odom_topic: odom                 # ← 相対名（NSで /<ns>/odom になる）
+    min_x_velocity_threshold: 0.001
+    min_theta_velocity_threshold: 0.001
+
+    controller_plugins: ["FollowPath"]
+    FollowPath:
+      plugin: "dwb_core::DWBLocalPlanner"
+
+      # 動き出しやすい初期値（必要に応じて後で調整）
+      min_vel_x: 0.05
+      max_vel_x: 0.35
+      min_vel_y: 0.0
+      max_vel_y: 0.0
+      max_vel_theta: 1.2
+      min_speed_xy: 0.05
+      max_speed_xy: 0.35
+      min_speed_theta: 0.1
+
+      acc_lim_x: 0.6
+      acc_lim_y: 0.0
+      acc_lim_theta: 1.2
+      decel_lim_x: -0.6
+      decel_lim_theta: -1.2
+
+      vx_samples: 15
+      vy_samples: 1
+      vtheta_samples: 25
+      sim_time: 1.5
+      linear_granularity: 0.05
+      angular_granularity: 0.025
+      transform_tolerance: 0.2
+      prune_plan: true
+
+      critics: ["ObstacleFootprint","PathDist","GoalDist","GoalAlign","PathAlign"]
+      ObstacleFootprint.scale: 0.02
+      PathDist.scale: 24.0
+      GoalDist.scale: 16.0
+      GoalAlign.scale: 1.0
+      PathAlign.scale: 1.0
+
+local_costmap:
+  local_costmap:
+    ros__parameters:
+      use_sim_time: true
+      update_frequency: 10.0
+      publish_frequency: 5.0
+
+      global_frame: odom            # ← 相対名（NSで /<ns>/odom）
+      robot_base_frame: base_link   # ← 相対名（NSで /<ns>/base_link）
+      rolling_window: true
+      width: 6
+      height: 6
+      resolution: 0.05
+
+      # 初回は障害物なしで動作確認→問題なければ scan を戻す
+      plugins: ["obstacle_layer","inflation_layer"]
+      obstacle_layer:
+        plugin: "nav2_costmap_2d::ObstacleLayer"
+        enabled: true
+        observation_sources: scan
+        scan:
+          topic: scan               # ← 相対名（NSで /<ns>/scan）
+          sensor_frame: base_scan   # ← 相対名（NSで /<ns>/base_scan）
+          data_type: LaserScan
+          clearing: true
+          marking: true
+          inf_is_valid: true
+          expected_update_rate: 0.0
+          observation_persistence: 0.0
+          min_obstacle_height: 0.0
+          max_obstacle_height: 2.0
+      inflation_layer:
+        plugin: "nav2_costmap_2d::InflationLayer"
+        enabled: true
+        inflation_radius: 0.8
+        cost_scaling_factor: 3.0
+
+global_costmap:
+  global_costmap:
+    ros__parameters:
+      use_sim_time: true
+      update_frequency: 5.0
+      publish_frequency: 2.0
+
+      global_frame: map             # ← 共有 /map を使うならここは 'map' 固定
+      robot_base_frame: base_link   # ← 相対名（NSで /<ns>/base_link）
+      rolling_window: false
+      track_unknown_space: true
+      resolution: 0.05
+
+      plugins: ["static_layer","obstacle_layer","inflation_layer"]
+      static_layer:
+        plugin: "nav2_costmap_2d::StaticLayer"
+        map_subscribe_transient_local: true
+        map_topic: /map             # ← 共有 /map を購読（絶対名）
+        subscribe_to_updates: false
+      obstacle_layer:
+        plugin: "nav2_costmap_2d::ObstacleLayer"
+        enabled: false              # ← 初回はOFFでもOK（動作確認優先）
+        observation_sources: ""
+      inflation_layer:
+        plugin: "nav2_costmap_2d::InflationLayer"
+        enabled: true
+        inflation_radius: 0.8
+        cost_scaling_factor: 3.0
+
+planner_server:
+  ros__parameters:
+    use_sim_time: true
+    expected_planner_frequency: 5.0
+    planner_plugins: ["GridBased"]
+    GridBased:
+      plugin: "nav2_navfn_planner/NavfnPlanner"
+      tolerance: 0.5
+
+behavior_server:
+  ros__parameters:
+    use_sim_time: true
+    cycle_frequency: 10.0
+    transform_tolerance: 0.3
+    simulate_ahead_time: 2.0
+    enable_stamped_cmd_vel: false
+    behavior_plugins: ["spin","backup","drive_on_heading","wait"]
+    spin:
+      plugin: "nav2_behaviors/Spin"
+    backup:
+      plugin: "nav2_behaviors/BackUp"
+    drive_on_heading:
+      plugin: "nav2_behaviors/DriveOnHeading"
+    wait:
+      plugin: "nav2_behaviors/Wait"
+
+bt_navigator:
+  ros__parameters:
+    use_sim_time: true
+    global_frame: map
+    robot_base_frame: base_link     # ← 相対名（NSで /<ns>/base_link）
+    # BT XML は launch 側で解決＆上書き推奨
+    plugin_lib_names:
+      - nav2_compute_path_to_pose_action_bt_node
+      - nav2_follow_path_action_bt_node
+      - nav2_back_up_action_bt_node
+      - nav2_spin_action_bt_node
+      - nav2_wait_action_bt_node
+      - nav2_clear_costmap_service_bt_node
+      - nav2_is_path_valid_condition_bt_node
+      - nav2_goal_reached_condition_bt_node
+      - nav2_initial_pose_received_condition_bt_node
+      - nav2_goal_updated_condition_bt_node
+      - nav2_recovery_node_bt_node
+      - nav2_pipeline_sequence_bt_node
+      - nav2_rate_controller_bt_node

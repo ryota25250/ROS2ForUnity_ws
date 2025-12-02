@@ -1,0 +1,246 @@
+# ===============================
+# Nav2 (robot1) — map は /map を使用
+# ===============================
+
+**:
+  ros__parameters:
+    use_sim_time: true
+
+amcl:
+  ros__parameters:
+    use_sim_time: true
+    base_frame_id: robot1/base_link
+    odom_frame_id: robot1/odom
+    global_frame_id: robot1/map
+    tf_broadcast: true
+
+    # 地図はグローバルの /map を購読（絶対名）
+    map_topic: /map
+
+    scan_topic: scan
+    min_particles: 500
+    max_particles: 2000
+    set_initial_pose: true
+    laser_max_range: 30.0
+    laser_min_range: 0.05
+    update_min_d: 0.05
+    update_min_a: 0.05
+    resample_interval: 1
+    transform_tolerance: 0.2
+
+map_server:
+  ros__parameters:
+    # 地図を /map で公開（絶対名）
+    topic_name: /map
+    frame_id: robot1/map
+    # yaml_filename は launch から渡す（ここでは未設定）
+
+controller_server:
+  ros__parameters:
+    use_sim_time: true
+    controller_frequency: 20.0
+    min_x_velocity_threshold: 0.001
+    min_y_velocity_threshold: 0.5
+    min_theta_velocity_threshold: 0.001
+    progress_checker:
+      plugin: "nav2_controller::SimpleProgressChecker"
+      required_movement_radius: 0.5
+      movement_time_allowance: 10.0
+    goal_checker:
+      plugin: "nav2_controller::SimpleGoalChecker"
+      xy_goal_tolerance: 0.25
+      yaw_goal_tolerance: 0.25
+      stateful: true
+    controller_plugins: ["FollowPath"]
+    FollowPath:
+      plugin: "dwb_core::DWBLocalPlanner"
+      debug_trajectory_details: false
+      min_vel_x: 0.0
+      max_vel_x: 0.7
+      max_vel_theta: 1.0
+      acc_lim_x: 1.0
+      acc_lim_theta: 3.2
+      decel_lim_x: -1.0
+      decel_lim_theta: -3.2
+      vx_samples: 20
+      vtheta_samples: 40
+      sim_time: 2.0
+      linear_granularity: 0.05
+      angular_granularity: 0.025
+      transform_tolerance: 0.2
+      critics:
+        - RotateToGoal
+        - Oscillation
+        - BaseObstacle
+        - GoalAlign
+        - PathAlign
+        - PathDist
+        - GoalDist
+      cmd_vel_topic: cmd_vel_nav
+
+planner_server:
+  ros__parameters:
+    use_sim_time: true
+    expected_planner_frequency: 5.0
+    planner_plugins: ["GridBased"]
+    GridBased:
+      plugin: "nav2_navfn_planner/NavfnPlanner"
+      tolerance: 0.5
+      use_astar: false
+      allow_unknown: true
+
+smoother_server:
+  ros__parameters:
+    use_sim_time: true
+    smoother_plugins: ["simple_smoother"]
+    simple_smoother:
+      plugin: "nav2_smoother::SimpleSmoother"
+      tolerance: 1.0
+      do_refinement: true
+      max_its: 1000
+
+behavior_server:
+  ros__parameters:
+    use_sim_time: true
+    behavior_plugins: ["spin", "backup", "drive_on_heading", "wait"]
+    spin:
+      plugin: "nav2_behaviors/Spin"
+    backup:
+      plugin: "nav2_behaviors/BackUp"
+    drive_on_heading:
+      plugin: "nav2_behaviors/DriveOnHeading"
+    wait:
+      plugin: "nav2_behaviors/Wait"
+
+bt_navigator:
+  ros__parameters:
+    use_sim_time: true
+    default_nav_to_pose_bt_xml: "navigate_to_pose_w_replanning_and_recovery.xml"
+    default_nav_through_poses_bt_xml: "navigate_through_poses_w_replanning_and_recovery.xml"
+
+waypoint_follower:
+  ros__parameters:
+    use_sim_time: true
+    loop_rate: 20.0
+    stop_on_failure: true
+    waypoint_task_executor_plugin: "wait_at_waypoint"
+    wait_at_waypoint:
+      plugin: "nav2_waypoint_follower::WaitAtWaypoint"
+      enabled: true
+      waypoint_pause_duration: 0.0
+
+velocity_smoother:
+  ros__parameters:
+    use_sim_time: true
+    smoothing_frequency: 20.0
+    scale_velocities: false
+    feedback: "OPEN_LOOP"
+    max_velocity: [0.7, 0.0, 1.0]
+    min_velocity: [0.0, 0.0, 0.0]
+    max_accel:    [1.0, 0.0, 3.2]
+    max_decel:    [1.0, 0.0, 3.2]
+    odometry_topic: odom
+
+# ----- Costmaps -----
+
+local_costmap:
+  local_costmap:
+    ros__parameters:
+      use_sim_time: true
+      update_frequency: 10.0
+      publish_frequency: 10.0
+      global_frame: robot1/odom
+      robot_base_frame: robot1/base_link
+      rolling_window: true
+      width: 5.0
+      height: 5.0
+      resolution: 0.05
+      always_send_full_costmap: true
+      footprint: "[[0.25, 0.20], [0.25, -0.20], [-0.25, -0.20], [-0.25, 0.20]]"
+      plugins: ["voxel_layer", "inflation_layer"]
+
+      voxel_layer:
+        plugin: "nav2_costmap_2d::VoxelLayer"
+        enabled: true
+        z_resolution: 0.05
+        origin_z: 0.0
+        z_voxels: 10
+        publish_voxel_map: false
+        max_obstacle_height: 2.0
+        unknown_threshold: 15
+        mark_threshold: 0
+        observation_sources: scan
+        scan:
+          topic: scan
+          data_type: "LaserScan"
+          clearing: true
+          marking: true
+          obstacle_range: 3.0
+          raytrace_range: 3.5
+
+      inflation_layer:
+        plugin: "nav2_costmap_2d::InflationLayer"
+        enabled: true
+        cost_scaling_factor: 3.0
+        inflation_radius: 0.5
+
+global_costmap:
+  global_costmap:
+    ros__parameters:
+      use_sim_time: true
+      update_frequency: 1.0
+      publish_frequency: 1.0
+      global_frame: robot1/map
+      robot_base_frame: robot1/base_link
+      rolling_window: false
+      width: 0.0
+      height: 0.0
+      resolution: 0.05
+      track_unknown_space: true
+      always_send_full_costmap: true
+      plugins: ["static_layer", "obstacle_layer", "inflation_layer"]
+
+      static_layer:
+        plugin: "nav2_costmap_2d::StaticLayer"
+        enabled: true
+        map_topic: /map              # 絶対名で /map を購読
+        subscribe_to_updates: false
+
+      obstacle_layer:
+        plugin: "nav2_costmap_2d::ObstacleLayer"
+        enabled: true
+        observation_sources: scan
+        scan:
+          topic: scan
+          data_type: "LaserScan"
+          clearing: true
+          marking: true
+          obstacle_range: 3.0
+          raytrace_range: 3.5
+
+      inflation_layer:
+        plugin: "nav2_costmap_2d::InflationLayer"
+        enabled: true
+        cost_scaling_factor: 3.0
+        inflation_radius: 0.5
+
+# ----- Lifecycle managers -----
+
+lifecycle_manager_localization:
+  ros__parameters:
+    use_sim_time: true
+    autostart: true
+    node_names: ["map_server", "amcl"]
+
+lifecycle_manager_navigation:
+  ros__parameters:
+    use_sim_time: true
+    autostart: true
+    node_names:
+      - "controller_server"
+      - "smoother_server"
+      - "planner_server"
+      - "behavior_server"
+      - "bt_navigator"
+      - "waypoint_follower"
+      - "velocity_smoother"

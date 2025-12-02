@@ -1,0 +1,204 @@
+# Nav2 for robot1 (namespace を robot1 で起動)
+# 共有地図は /map、TF は robot1/xxx を参照する構成
+# 例:
+# ros2 launch nav2_bringup bringup_launch.py \
+#   use_namespace:=True namespace:=robot1 \
+#   map:=/home/moriokalab/ROS2ForUnity_ws/my_unity_map_2.yaml \
+#   params_file:=/home/moriokalab/ROS2ForUnity_ws/config/nav2_robot1_11.yaml \
+#   use_sim_time:=True
+
+amcl:
+  ros__parameters:
+    use_sim_time: true
+    # フレーム整合
+    global_frame_id: map          # 親は /map（共有）
+    odom_frame_id: robot1/odom
+    base_frame_id: robot1/base_link
+    tf_broadcast: true
+
+    # センサ入力（robot1 で名前空間解決 → /robot1/scan）
+    scan_topic: scan
+
+    # 既定値系（必要に応じて微調整）
+    update_min_d: 0.05
+    update_min_a: 0.05
+    set_initial_pose: false
+    always_reset_initial_pose: false
+    first_map_only: false
+    save_pose_rate: 0.5
+    alpha1: 0.2
+    alpha2: 0.2
+    alpha3: 0.2
+    alpha4: 0.2
+    alpha5: 0.2
+    laser_min_range: 0.0
+    laser_max_range: 0.0
+    min_particles: 500
+    max_particles: 2000
+    pf_err: 0.05
+    pf_z: 0.99
+    kld_err: 0.05
+    kld_z: 0.99
+
+map_server:
+  ros__parameters:
+    use_sim_time: True
+    # Overridden in launch by the "map" launch configuration or provided default value.
+    # To use in yaml, remove the default "map" value in the tb3_simulation_launch.py file & provide full path to map below.
+    yaml_filename: /home/moriokalab/ROS2ForUnity_ws/my_unity_map_2.yaml
+    # ★ /map をグローバルで発行
+    topic_name: /map
+    # map メッセージの frame_id も Unity 側に合わせる
+    frame_id: robot1/map
+
+bt_navigator:
+  ros__parameters:
+    use_sim_time: true
+    global_frame: map
+    robot_base_frame: robot1/base_link
+    transform_tolerance: 0.2
+
+controller_server:
+  ros__parameters:
+    use_sim_time: true
+    controller_frequency: 20.0
+    min_x_velocity_threshold: 0.001
+    min_y_velocity_threshold: 0.001
+    min_theta_velocity_threshold: 0.001
+    progress_checker:
+      plugin: "nav2_controller::SimpleProgressChecker"
+      required_movement_radius: 0.5
+      movement_time_allowance: 10.0
+    goal_checker:
+      plugin: "nav2_controller::SimpleGoalChecker"
+      xy_goal_tolerance: 0.2
+      yaw_goal_tolerance: 0.2
+      stateful: true
+    FollowPath:
+      plugin: "dwb_core::DWBLocalPlanner"
+      debug_trajectory_details: false
+      # DWB フレーム
+      base_frame_id: robot1/base_link
+      global_frame_id: map
+      # ここでの laser は costmap プラグインから参照されるため、特に設定不要
+
+local_costmap:
+  local_costmap:
+    ros__parameters:
+      use_sim_time: true
+      # ローカルは odom 座標
+      global_frame: robot1/odom
+      robot_base_frame: robot1/base_link
+      update_frequency: 10.0
+      publish_frequency: 10.0
+      transform_tolerance: 0.3
+      rolling_window: true
+      width: 5.0
+      height: 5.0
+      resolution: 0.05
+      plugins: ["voxel_layer", "inflation_layer"]
+
+      voxel_layer:
+        plugin: "nav2_costmap_2d::VoxelLayer"
+        enabled: true
+        footprint_clearing_enabled: true
+        origin_z: 0.0
+        z_voxels: 10
+        z_resolution: 0.05
+        max_obstacle_height: 2.0
+        # int → double の型エラー対策（小数で記述）
+        publish_voxel_map: false
+        observation_sources: scan
+        scan:
+          topic: scan         # 相対名 → /robot1/scan
+          max_obstacle_height: 2.0
+          clearing: true
+          marking: true
+          data_type: "LaserScan"
+          inf_is_valid: true
+
+      inflation_layer:
+        plugin: "nav2_costmap_2d::InflationLayer"
+        cost_scaling_factor: 3.0
+        inflation_radius: 0.55
+
+global_costmap:
+  global_costmap:
+    ros__parameters:
+      use_sim_time: true
+      global_frame: map
+      robot_base_frame: robot1/base_link
+      update_frequency: 1.0
+      publish_frequency: 1.0
+      transform_tolerance: 0.5
+      resolution: 0.05
+      track_unknown_space: true
+      plugins: ["static_layer", "obstacle_layer", "inflation_layer"]
+
+      # 共有マップ /map を明示
+      static_layer:
+        plugin: "nav2_costmap_2d::StaticLayer"
+        enabled: true
+        map_topic: "/map"      # ★重要: /robot1/map ではなく /map を購読
+        subscribe_to_updates: false
+
+      obstacle_layer:
+        plugin: "nav2_costmap_2d::ObstacleLayer"
+        enabled: true
+        observation_sources: scan
+        scan:
+          topic: scan          # 相対名 → /robot1/scan
+          clearing: true
+          marking: true
+          data_type: "LaserScan"
+          inf_is_valid: true
+
+      inflation_layer:
+        plugin: "nav2_costmap_2d::InflationLayer"
+        cost_scaling_factor: 3.0
+        inflation_radius: 0.65
+
+planner_server:
+  ros__parameters:
+    use_sim_time: true
+    expected_planner_frequency: 10.0
+    planner_plugins: ["GridBased"]
+    GridBased:
+      plugin: "nav2_navfn_planner/NavfnPlanner"
+      tolerance: 0.5
+      use_astar: false
+      allow_unknown: true
+
+behavior_server:
+  ros__parameters:
+    use_sim_time: true
+    plugin_lib_names: ["spin", "backup", "drive_on_heading", "wait"]
+    spin:
+      plugin: "nav2_behaviors/Spin"
+    backup:
+      plugin: "nav2_behaviors/BackUp"
+    drive_on_heading:
+      plugin: "nav2_behaviors/DriveOnHeading"
+    wait:
+      plugin: "nav2_behaviors/Wait"
+
+waypoint_follower:
+  ros__parameters:
+    use_sim_time: true
+    loop_rate: 20
+    stop_on_failure: false
+    waypoint_task_executor_plugin: "wait_at_waypoint"
+    wait_at_waypoint:
+      plugin: "nav2_waypoint_follower::WaitAtWaypoint"
+      enabled: true
+      waypoint_pause_duration: 0
+
+velocity_smoother:
+  ros__parameters:
+    use_sim_time: true
+    smoothing_frequency: 20.0
+    scale_velocities: true
+    feedback: "OPEN_LOOP"
+    max_velocity: [0.5, 0.0, 1.0]
+    min_velocity: [0.0, 0.0, 0.0]
+    # DWB → velocity_smoother → /robot1/cmd_vel の流れ

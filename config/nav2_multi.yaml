@@ -29,7 +29,7 @@ controller_server:
         plugin: "nav2_regulated_pure_pursuit_controller::RegulatedPurePursuitController"
 
         # 基本速度
-        desired_linear_vel: 1.0
+        desired_linear_vel: 0.35
         max_linear_accel: 2.0
         max_linear_decel: 2.0
         max_angular_vel: 2.0                 # 回頭を力強く

@@ -149,6 +149,8 @@ bt_navigator:
     use_sim_time: true
     global_frame: map
     robot_base_frame: base_link     # ← 相対名（NSで /<ns>/base_link）
+    bt_loop_duration: 50   # ← 追加（ms）。10ms=100Hz → 50ms=20Hz
+    bt_loop_duration: 100  # 100ms = 10Hz
     # BT XML は launch 側で解決＆上書き推奨
     plugin_lib_names:
       - nav2_compute_path_to_pose_action_bt_node

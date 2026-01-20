@@ -100,34 +100,6 @@ def generate_launch_description():
         convert_types=True
     )
 
-    # ==== map_server（グローバル /map を配信）====
-    map_server = LifecycleNode(
-        condition=IfCondition(start_map),
-        package='nav2_map_server',
-        executable='map_server',
-        name='map_server',
-        namespace='',
-        output='screen',
-        parameters=[{
-            'use_sim_time': use_sim,
-            'yaml_filename': map_yaml,
-            'frame_id': 'map',        # /map フレーム
-        }],
-        remappings=[('map', '/map'), ('map_metadata', '/map_metadata')],
-    )
-    lm_map = Node(
-        condition=IfCondition(start_map),
-        package='nav2_lifecycle_manager',
-        executable='lifecycle_manager',
-        name='lifecycle_manager_map',
-        namespace='',
-        output='screen',
-        parameters=[{
-            'use_sim_time': use_sim,
-            'autostart': autostart,
-            'node_names': ['map_server'],
-        }],
-    )
 
     # ==== AMCL（/map を購読、frames は ns 付き）====
     amcl = LifecycleNode(
@@ -273,7 +245,6 @@ def generate_launch_description():
         ns_arg, use_sim_arg, map_yaml_arg, autostart_arg,
         start_map_arg, start_amcl_arg, start_plan_arg, start_ctrl_arg, start_beh_arg, start_bt_arg,
         # 起動順の都合で個別 GroupAction にしてもOKだが、ここでは直列記述
-        map_server, lm_map,
         amcl, lm_loc,
         planner, lm_plan,
         controller, lm_ctrl,

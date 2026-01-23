@@ -109,7 +109,7 @@ def generate_launch_description():
         name='amcl',
         namespace=ns,
         output='screen',
-        parameters=[{
+        parameters=[rewritten, {
             'use_sim_time': use_sim,
             'base_frame_id': base_link,
             'odom_frame_id': odom,

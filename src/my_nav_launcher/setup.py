@@ -26,6 +26,7 @@ setup(
             'amcl_pose_relay = my_nav_launcher.amcl_pose_relay:main',
             'robot1_cmd_vel_pub = my_nav_launcher.robot1_cmd_vel_pub:main',
             'robot1_safety_stop = my_nav_launcher.robot1_safety_stop:main',
+            'tf_to_path = my_nav_launcher.tf_to_path:main',
         ],
     },
 )

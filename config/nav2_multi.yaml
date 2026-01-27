@@ -5,6 +5,11 @@ controller_server:
       controller_frequency: 7.5
       use_sim_time: true
 
+      amcl:
+        ros__parameters:
+          use_sim_time: true
+          odom_frame_id: "odom"
+
       # ★回頭中に「進んでない」と誤判定しないよう猶予を伸ばす
       progress_checker:
         plugin: "nav2_controller::SimpleProgressChecker"
@@ -48,31 +53,6 @@ controller_server:
         regulated_linear_scaling_min_radius: 0.8
         regulated_linear_scaling_min_speed: 0.05
         inflation_cost_scaling_factor: 2.5
-
-amcl:
-        ros__parameters:
-          use_sim_time: true
-          odom_frame_id: "odom"
-
-        # 粒子数を減らす（効果大）
-        min_particles: 200
-        max_particles: 1000
-
-        # 更新を間引く（動いた時だけ更新する方向）
-        update_min_d: 0.20        # (m)  小さいほど頻繁、重い → 0.2〜0.3へ
-        update_min_a: 0.20        # (rad)
-
-        # レーザ本数を減らす（効果大）
-        laser_max_beams: 30       # 60/90などより軽い
-
-        # リサンプル頻度を下げる
-        resample_interval: 2
-
-        # ビームスキップ（環境によっては有効）
-        do_beamskip: true
-        beam_skip_distance: 0.5
-        beam_skip_threshold: 0.3
-        beam_skip_error_threshold: 0.9
 
 local_costmap:
     local_costmap:

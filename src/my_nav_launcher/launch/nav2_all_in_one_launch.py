@@ -9,6 +9,7 @@ from launch.substitutions import LaunchConfiguration, TextSubstitution
 from launch_ros.actions import LifecycleNode, Node
 from nav2_common.launch import RewrittenYaml
 from ament_index_python.packages import get_package_share_directory
+from launch.actions import DeclareLaunchArgument, GroupAction, TimerAction
 
 # あなたの共通パラメータ（ロボット名を含まない版）
 PARAMS_FILE = '/home/moriokalab/ROS2ForUnity_ws/config/nav2_multi.yaml'
@@ -244,10 +245,19 @@ def generate_launch_description():
     return LaunchDescription([
         ns_arg, use_sim_arg, map_yaml_arg, autostart_arg,
         start_map_arg, start_amcl_arg, start_plan_arg, start_ctrl_arg, start_beh_arg, start_bt_arg,
-        # 起動順の都合で個別 GroupAction にしてもOKだが、ここでは直列記述
-        amcl, lm_loc,
-        planner, lm_plan,
-        controller, lm_ctrl,
-        behavior, lm_beh,
-        btnav, lm_bt,
+
+        TimerAction(period=0.0, actions=[amcl]),
+        TimerAction(period=1.0, actions=[lm_loc]),
+
+        TimerAction(period=2.0, actions=[planner]),
+        TimerAction(period=3.0, actions=[lm_plan]),
+
+        TimerAction(period=4.0, actions=[controller]),
+        TimerAction(period=5.0, actions=[lm_ctrl]),
+
+        TimerAction(period=6.0, actions=[behavior]),
+        TimerAction(period=7.0, actions=[lm_beh]),
+
+        TimerAction(period=8.0, actions=[btnav]),
+        TimerAction(period=9.0, actions=[lm_bt]),
     ])

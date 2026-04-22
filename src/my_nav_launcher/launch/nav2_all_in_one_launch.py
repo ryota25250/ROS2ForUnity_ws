@@ -12,7 +12,7 @@ from ament_index_python.packages import get_package_share_directory
 from launch.actions import DeclareLaunchArgument, GroupAction, TimerAction
 
 # あなたの共通パラメータ（ロボット名を含まない版）
-PARAMS_FILE = '/home/moriokalab/ROS2ForUnity_ws/config/nav2_multi.yaml'
+PARAMS_FILE = '/home/morioka/ROS2ForUnity_ws/config/nav2_multi.yaml'
 
 def _pick_or_fallback_bt_xml():
     bt_dir = os.path.join(get_package_share_directory('nav2_bt_navigator'), 'behavior_trees')
@@ -42,7 +42,7 @@ def generate_launch_description():
     # ==== 引数 ====
     ns_arg          = DeclareLaunchArgument('ns', default_value='robot1', description='namespace (robot id)')
     use_sim_arg     = DeclareLaunchArgument('use_sim_time', default_value='true')
-    map_yaml_arg    = DeclareLaunchArgument('map_yaml', default_value='/home/moriokalab/ROS2ForUnity_ws/my_unity_map_2.yaml')
+    map_yaml_arg    = DeclareLaunchArgument('map_yaml', default_value='/home/morioka/ROS2ForUnity_ws/my_unity_map_2.yaml')
     autostart_arg   = DeclareLaunchArgument('autostart', default_value='true')
     start_map_arg   = DeclareLaunchArgument('start_map_server', default_value='true', description='start global map_server')
     start_amcl_arg  = DeclareLaunchArgument('start_amcl', default_value='true')

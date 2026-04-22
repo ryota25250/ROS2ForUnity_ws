@@ -9,7 +9,7 @@ from launch.conditions import IfCondition
 from launch_ros.actions import LifecycleNode, Node
 from nav2_common.launch import RewrittenYaml
 
-PARAMS_FILE = '/home/moriokalab/ROS2ForUnity_ws/config/nav2_multi.yaml'
+PARAMS_FILE = '/home/morioka/ROS2ForUnity_ws/config/nav2_multi.yaml'
 
 def generate_launch_description():
     ns_arg        = DeclareLaunchArgument('ns', default_value='robot1')

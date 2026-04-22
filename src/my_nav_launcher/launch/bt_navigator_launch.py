@@ -10,7 +10,7 @@ from launch_ros.actions import LifecycleNode, Node
 from nav2_common.launch import RewrittenYaml
 from ament_index_python.packages import get_package_share_directory
 
-PARAMS_FILE = '/home/moriokalab/ROS2ForUnity_ws/config/nav2_multi.yaml'
+PARAMS_FILE = '/home/morioka/ROS2ForUnity_ws/config/nav2_multi.yaml'
 
 def _pick_or_fallback_bt_xml():
     bt_dir = os.path.join(get_package_share_directory('nav2_bt_navigator'), 'behavior_trees')

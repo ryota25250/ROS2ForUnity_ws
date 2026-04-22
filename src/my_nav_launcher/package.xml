@@ -4,7 +4,7 @@
   <name>my_nav_launcher</name>
   <version>0.0.0</version>
   <description>TODO: Package description</description>
-  <maintainer email="moriokalab@todo.todo">moriokalab</maintainer>
+  <maintainer email="morioka@todo.todo">morioka</maintainer>
   <license>TODO: License declaration</license>
 
   <test_depend>ament_copyright</test_depend>

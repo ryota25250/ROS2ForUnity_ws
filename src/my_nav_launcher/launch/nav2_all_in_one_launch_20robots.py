@@ -10,12 +10,18 @@ from launch_ros.actions import LifecycleNode, Node
 from nav2_common.launch import RewrittenYaml
 from ament_index_python.packages import get_package_share_directory
 
-# 共通パラメータ（各ロボット名を root_key で差し込む前提）
 PARAMS_FILE = '/home/morioka/ROS2ForUnity_ws/config/nav2_multi.yaml'
 
 
 def _str2bool(value: str) -> bool:
     return str(value).strip().lower() in ('1', 'true', 'yes', 'on')
+
+
+def _robot_index_from_ns(ns: str) -> int:
+    match = re.search(r'(\d+)$', ns)
+    if not match:
+        return 1
+    return max(1, int(match.group(1)))
 
 
 def _pick_or_fallback_bt_xml() -> str:
@@ -45,19 +51,12 @@ def _pick_or_fallback_bt_xml() -> str:
     return tmp_path
 
 
-def _robot_index_from_ns(ns: str) -> int:
-    match = re.search(r'(\d+)$', ns)
-    if not match:
-        return 1
-    return max(1, int(match.group(1)))
-
-
 def _launch_setup(context, *args, **kwargs):
     ns = LaunchConfiguration('ns').perform(context)
     use_sim = _str2bool(LaunchConfiguration('use_sim_time').perform(context))
     autostart = _str2bool(LaunchConfiguration('autostart').perform(context))
 
-    # 互換性維持用（現行コマンドがそのまま動くように残す）
+    # 互換性維持用（既存コマンドを壊さないため残す）
     _ = LaunchConfiguration('map_yaml').perform(context)
     _ = LaunchConfiguration('start_map_server').perform(context)
     _ = LaunchConfiguration('use_composition').perform(context)
@@ -67,7 +66,6 @@ def _launch_setup(context, *args, **kwargs):
     start_ctrl = _str2bool(LaunchConfiguration('start_controller').perform(context))
     start_beh = _str2bool(LaunchConfiguration('start_behavior').perform(context))
     start_bt = _str2bool(LaunchConfiguration('start_bt').perform(context))
-
     set_initial_pose = _str2bool(LaunchConfiguration('set_initial_pose').perform(context))
 
     startup_spacing = float(LaunchConfiguration('startup_spacing').perform(context))
@@ -80,15 +78,16 @@ def _launch_setup(context, *args, **kwargs):
     scan = f'/{ns}/scan'
     safe_bt = _pick_or_fallback_bt_xml()
 
+    # RewrittenYaml には string を渡し、convert_types=True で型変換させる
     param_rewrites = {
         # AMCL
-        'amcl.ros__parameters.use_sim_time': use_sim,
+        'amcl.ros__parameters.use_sim_time': 'true' if use_sim else 'false',
         'amcl.ros__parameters.base_frame_id': base_link,
         'amcl.ros__parameters.odom_frame_id': odom,
         'amcl.ros__parameters.global_frame_id': 'map',
         'amcl.ros__parameters.scan_topic': 'scan',
         'amcl.ros__parameters.map_topic': '/map',
-        'amcl.ros__parameters.set_initial_pose': set_initial_pose,
+        'amcl.ros__parameters.set_initial_pose': 'true' if set_initial_pose else 'false',
         'amcl.ros__parameters.initial_pose.x': LaunchConfiguration('initial_pose_x').perform(context),
         'amcl.ros__parameters.initial_pose.y': LaunchConfiguration('initial_pose_y').perform(context),
         'amcl.ros__parameters.initial_pose.z': '0.0',
@@ -97,6 +96,7 @@ def _launch_setup(context, *args, **kwargs):
 
         # planner / global_costmap
         'planner_server.ros__parameters.expected_planner_frequency': '0.5',
+        'global_costmap.global_costmap.ros__parameters.use_sim_time': 'true' if use_sim else 'false',
         'global_costmap.global_costmap.ros__parameters.global_frame': 'map',
         'global_costmap.global_costmap.ros__parameters.robot_base_frame': base_link,
         'global_costmap.global_costmap.ros__parameters.transform_tolerance': '0.5',
@@ -108,9 +108,11 @@ def _launch_setup(context, *args, **kwargs):
         'global_costmap.global_costmap.ros__parameters.static_layer.map_subscribe_transient_local': 'true',
 
         # controller / local_costmap
+        'controller_server.ros__parameters.use_sim_time': 'true' if use_sim else 'false',
         'controller_server.ros__parameters.odom_topic': f'/{ns}/odom',
         'controller_server.ros__parameters.controller_frequency': '5.0',
         'controller_server.ros__parameters.failure_tolerance': '0.5',
+        'local_costmap.local_costmap.ros__parameters.use_sim_time': 'true' if use_sim else 'false',
         'local_costmap.local_costmap.ros__parameters.global_frame': odom,
         'local_costmap.local_costmap.ros__parameters.robot_base_frame': base_link,
         'local_costmap.local_costmap.ros__parameters.transform_tolerance': '0.5',
@@ -120,6 +122,7 @@ def _launch_setup(context, *args, **kwargs):
         'local_costmap.local_costmap.ros__parameters.obstacle_layer.scan.sensor_frame': f'{ns}/base_scan',
 
         # behavior_server
+        'behavior_server.ros__parameters.use_sim_time': 'true' if use_sim else 'false',
         'behavior_server.ros__parameters.global_frame': 'map',
         'behavior_server.ros__parameters.local_frame': odom,
         'behavior_server.ros__parameters.robot_base_frame': base_link,
@@ -127,6 +130,7 @@ def _launch_setup(context, *args, **kwargs):
         'behavior_server.ros__parameters.cycle_frequency': '5.0',
 
         # bt_navigator
+        'bt_navigator.ros__parameters.use_sim_time': 'true' if use_sim else 'false',
         'bt_navigator.ros__parameters.global_frame': 'map',
         'bt_navigator.ros__parameters.robot_base_frame': base_link,
         'bt_navigator.ros__parameters.default_nav_to_pose_bt_xml': safe_bt,
@@ -144,7 +148,6 @@ def _launch_setup(context, *args, **kwargs):
 
     actions = []
 
-    # --- AMCL ---
     if start_amcl:
         amcl = LifecycleNode(
             package='nav2_amcl',
@@ -157,7 +160,6 @@ def _launch_setup(context, *args, **kwargs):
             parameters=[rewritten, {'use_sim_time': use_sim}],
             remappings=[('map', '/map'), ('map_metadata', '/map_metadata')],
         )
-
         lm_loc = Node(
             package='nav2_lifecycle_manager',
             executable='lifecycle_manager',
@@ -175,11 +177,9 @@ def _launch_setup(context, *args, **kwargs):
                 'bond_respawn_max_duration': 60.0,
             }],
         )
-
         actions.append(TimerAction(period=base_delay + 0.0, actions=[amcl]))
         actions.append(TimerAction(period=base_delay + 1.5, actions=[lm_loc]))
 
-    # --- Nav stack (1つの lifecycle_manager で順序管理) ---
     nav_nodes = []
     nav_node_names = []
     nav_start_base = base_delay + startup_spacing
@@ -272,7 +272,6 @@ def generate_launch_description():
         DeclareLaunchArgument('use_sim_time', default_value='true'),
         DeclareLaunchArgument('autostart', default_value='true'),
 
-        # 現行コマンド互換用（この launch では未使用だが、既存の実行コマンドを壊さないため残す）
         DeclareLaunchArgument('map_yaml', default_value='/home/morioka/ROS2ForUnity_ws/my_unity_map_2.yaml'),
         DeclareLaunchArgument('start_map_server', default_value='false'),
         DeclareLaunchArgument('use_composition', default_value='false'),
@@ -283,11 +282,9 @@ def generate_launch_description():
         DeclareLaunchArgument('start_behavior', default_value='true'),
         DeclareLaunchArgument('start_bt', default_value='true'),
 
-        # 起動をばらすための遅延設定
         DeclareLaunchArgument('startup_spacing', default_value='4.0', description='amcl 起動後に nav stack を開始するまでの秒数'),
         DeclareLaunchArgument('per_robot_offset', default_value='0.0', description='robot番号ごとの追加遅延（例: 2.0 なら robot2 は +2秒, robot3 は +4秒）'),
 
-        # AMCL の初期姿勢（set_initial_pose:=true のときのみ使用）
         DeclareLaunchArgument('set_initial_pose', default_value='false'),
         DeclareLaunchArgument('initial_pose_x', default_value='0.0'),
         DeclareLaunchArgument('initial_pose_y', default_value='0.0'),

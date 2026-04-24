@@ -54,8 +54,8 @@ def _robot_index_from_ns(ns: str) -> int:
 
 def _launch_setup(context, *args, **kwargs):
     ns = LaunchConfiguration('ns').perform(context)
-    use_sim = LaunchConfiguration('use_sim_time').perform(context)
-    autostart = LaunchConfiguration('autostart').perform(context)
+    use_sim = _str2bool(LaunchConfiguration('use_sim_time').perform(context))
+    autostart = _str2bool(LaunchConfiguration('autostart').perform(context))
 
     # 互換性維持用（現行コマンドがそのまま動くように残す）
     _ = LaunchConfiguration('map_yaml').perform(context)
@@ -88,7 +88,7 @@ def _launch_setup(context, *args, **kwargs):
         'amcl.ros__parameters.global_frame_id': 'map',
         'amcl.ros__parameters.scan_topic': 'scan',
         'amcl.ros__parameters.map_topic': '/map',
-        'amcl.ros__parameters.set_initial_pose': str(set_initial_pose).lower(),
+        'amcl.ros__parameters.set_initial_pose': set_initial_pose,
         'amcl.ros__parameters.initial_pose.x': LaunchConfiguration('initial_pose_x').perform(context),
         'amcl.ros__parameters.initial_pose.y': LaunchConfiguration('initial_pose_y').perform(context),
         'amcl.ros__parameters.initial_pose.z': '0.0',

@@ -206,7 +206,7 @@ def generate_launch_description():
         parameters=[{
             'use_sim_time': use_sim,
             'autostart': autostart,
-            'node_names': ['behavior_server'],
+            'node_names': ['behavior_server', 'bt_navigator'],
             'bond_timeout': 0.0
         }]
     )
@@ -228,21 +228,6 @@ def generate_launch_description():
             'server_timeout': 5000,
         }],
     )
-    lm_bt = Node(
-        condition=IfCondition(start_bt),
-        package='nav2_lifecycle_manager',
-        executable='lifecycle_manager',
-        name='lifecycle_manager_bt',
-        namespace=ns,
-        output='screen',
-        parameters=[{
-            'use_sim_time': use_sim,
-            'autostart': autostart,
-            'node_names': ['bt_navigator'],
-            'bond_timeout': 0.0
-        }]
-    )
-
     return LaunchDescription([
         ns_arg, use_sim_arg, map_yaml_arg, autostart_arg,
         start_map_arg, start_amcl_arg, start_plan_arg, start_ctrl_arg, start_beh_arg, start_bt_arg,
@@ -257,8 +242,6 @@ def generate_launch_description():
         TimerAction(period=5.0, actions=[lm_ctrl]),
 
         TimerAction(period=6.0, actions=[behavior]),
-        TimerAction(period=7.0, actions=[lm_beh]),
-
         TimerAction(period=8.0, actions=[btnav]),
-        TimerAction(period=9.0, actions=[lm_bt]),
+        TimerAction(period=10.0, actions=[lm_beh]),
     ])

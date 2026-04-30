@@ -131,6 +131,7 @@ def generate_launch_description():
             'use_sim_time': use_sim,
             'autostart': autostart,
             'node_names': ['amcl'],
+            'bond_timeout': 0.0
         }]
     )
 

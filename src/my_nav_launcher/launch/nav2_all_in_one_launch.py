@@ -1,28 +1,17 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-import os
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument, GroupAction
+from launch.actions import DeclareLaunchArgument, TimerAction
 from launch.conditions import IfCondition
 from launch.substitutions import LaunchConfiguration, TextSubstitution
 from launch_ros.actions import LifecycleNode, Node
 from nav2_common.launch import RewrittenYaml
-from ament_index_python.packages import get_package_share_directory
-from launch.actions import DeclareLaunchArgument, GroupAction, TimerAction
 
 # あなたの共通パラメータ（ロボット名を含まない版）
 PARAMS_FILE = '/home/morioka/ROS2ForUnity_ws/config/nav2_multi.yaml'
 
 def _pick_or_fallback_bt_xml():
-    bt_dir = os.path.join(get_package_share_directory('nav2_bt_navigator'), 'behavior_trees')
-    primary = os.path.join(bt_dir, 'navigate_to_pose.xml')
-    repl   = os.path.join(bt_dir, 'navigate_to_pose_w_replanning.xml')
-    if os.path.exists(primary):
-        return primary
-    if os.path.exists(repl):
-        return repl
-    # 最小構成を /tmp に生成（ComputePathToPose -> FollowPath）
     tmp_path = '/tmp/nav2_min_bt.xml'
     minimal_xml = """<?xml version="1.0"?>
 <root main_tree_to_execute="MainTree">
@@ -48,7 +37,7 @@ def generate_launch_description():
     start_amcl_arg  = DeclareLaunchArgument('start_amcl', default_value='true')
     start_plan_arg  = DeclareLaunchArgument('start_planner', default_value='true')
     start_ctrl_arg  = DeclareLaunchArgument('start_controller', default_value='true')
-    start_beh_arg   = DeclareLaunchArgument('start_behavior', default_value='true')
+    start_beh_arg   = DeclareLaunchArgument('start_behavior', default_value='false')
     start_bt_arg    = DeclareLaunchArgument('start_bt', default_value='true')
 
     ns          = LaunchConfiguration('ns')
@@ -206,7 +195,7 @@ def generate_launch_description():
         parameters=[{
             'use_sim_time': use_sim,
             'autostart': autostart,
-            'node_names': ['behavior_server', 'bt_navigator'],
+            'node_names': ['behavior_server'],
             'bond_timeout': 0.0
         }]
     )
@@ -228,6 +217,21 @@ def generate_launch_description():
             'server_timeout': 5000,
         }],
     )
+    lm_bt = Node(
+        condition=IfCondition(start_bt),
+        package='nav2_lifecycle_manager',
+        executable='lifecycle_manager',
+        name='lifecycle_manager_bt',
+        namespace=ns,
+        output='screen',
+        parameters=[{
+            'use_sim_time': use_sim,
+            'autostart': autostart,
+            'node_names': ['bt_navigator'],
+            'bond_timeout': 0.0
+        }]
+    )
+
     return LaunchDescription([
         ns_arg, use_sim_arg, map_yaml_arg, autostart_arg,
         start_map_arg, start_amcl_arg, start_plan_arg, start_ctrl_arg, start_beh_arg, start_bt_arg,
@@ -242,6 +246,7 @@ def generate_launch_description():
         TimerAction(period=5.0, actions=[lm_ctrl]),
 
         TimerAction(period=6.0, actions=[behavior]),
+        TimerAction(period=7.0, actions=[lm_beh]),
         TimerAction(period=8.0, actions=[btnav]),
-        TimerAction(period=10.0, actions=[lm_beh]),
+        TimerAction(period=12.0, actions=[lm_bt]),
     ])

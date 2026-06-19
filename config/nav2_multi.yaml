@@ -13,8 +13,8 @@ controller_server:
       # ★回頭中に「進んでない」と誤判定しないよう猶予を伸ばす
       progress_checker:
         plugin: "nav2_controller::SimpleProgressChecker"
-        required_movement_radius: 0.02       # 並進しなくてもOKに近い数値
-        movement_time_allowance: 15.0        # その場回転の最中に fail させない
+        required_movement_radius: 0.005      # まずは微小移動でも progress とみなす
+        movement_time_allowance: 30.0        # 切り分け中は fail 判定を遅らせる
 
       # ★ゴール判定：姿勢もきちんと合わせたいなら少しタイトに
       goal_checker:
@@ -74,8 +74,8 @@ local_costmap:
 
         obstacle_layer:
           plugin: "nav2_costmap_2d::ObstacleLayer"
-          enabled: true
-          observation_sources: scan
+          enabled: false                      # 切り分け用: local scan 障害物を一時停止
+          observation_sources: ""
           scan:
             topic: "<ns>/scan"
             data_type: "LaserScan"
